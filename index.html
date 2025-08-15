@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POS Cafetería</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .producto-seleccionado {
+      background-color: #d4edda !important;
+      border: 2px solid #28a745 !important;
+      transition: background-color 0.2s ease, border 0.2s ease;
+    }
+  </style>
+</head>
+<body class="bg-amber-50 text-gray-800">
+  <!-- Encabezado -->
+  <header class="bg-amber-700 text-white p-4 text-center">
+    <h1 class="text-2xl font-extrabold tracking-wide">POS Cafetería</h1>
+    <p class="text-amber-200 text-sm">Venta rápida · Ticket · Ventas del día · Productos · Cierre</p>
+  </header>
+
+  <!-- Contenido principal -->
+  <main class="p-4 max-w-6xl mx-auto">
+    <!-- Pestañas -->
+    <div class="flex flex-wrap gap-2 mb-4">
+      <button id="tab-venta" class="tab-btn px-4 py-2 rounded bg-amber-700 text-white">Venta</button>
+      <button id="tab-ventas-dia" class="tab-btn px-4 py-2 rounded bg-white border">Ventas del día</button>
+      <button id="tab-productos" class="tab-btn px-4 py-2 rounded bg-white border">Productos</button>
+      <button id="tab-cierre" class="tab-btn px-4 py-2 rounded bg-white border">Cierre</button>
+    </div>
+
+    <!-- Sección Venta -->
+    <section id="view-venta" class="space-y-4">
+      <!-- Barra de búsqueda y filtros -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <input id="search" type="text" placeholder="Buscar producto..." class="w-full p-2 border rounded col-span-2">
+        <select id="filter-category" class="p-2 border rounded">
+          <option value="">Todas las categorías</option>
+        </select>
+      </div>
+
+      <!-- Lista de productos -->
+      <div id="product-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
+
+      <!-- Carrito -->
+      <div class="mt-2 bg-white p-4 rounded shadow">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-bold">Carrito</h2>
+          <div class="flex gap-2">
+            <button id="btn-clear" class="px-3 py-1 border rounded">Vaciar</button>
+          </div>
+        </div>
+        <ul id="cart" class="divide-y my-3"></ul>
+        <div class="flex items-center justify-between">
+          <div class="text-sm text-gray-500" id="cart-items-count">0 ítems</div>
+          <div class="text-right">
+            <div class="text-sm">Subtotal: <span id="subtotal" class="font-semibold">$0</span></div>
+            <div class="text-sm">Descuento: <span id="discount-amount" class="font-semibold">$0</span></div>
+            <div class="text-lg font-extrabold">Total: <span id="total">$0</span></div>
+          </div>
+        </div>
+        <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <input id="discount" type="number" min="0" max="100" class="p-2 border rounded keypadable" data-keypad="percent" placeholder="Descuento % (opcional)">
+          <select id="pay-method" class="p-2 border rounded">
+            <option value="Efectivo">Efectivo</option>
+            <option value="Transferencia">Transferencia</option>
+            <option value="QR">QR</option>
+          </select>
+          <input id="cash-received" type="number" min="0" class="p-2 border rounded keypadable" data-keypad="money" placeholder="Recibido (solo efectivo)">
+        </div>
+        <div class="mt-2 text-right text-sm">Cambio: <span id="change" class="font-semibold">$0</span></div>
+        <button id="checkout" class="bg-green-600 text-white px-4 py-2 rounded mt-4 w-full sm:w-auto">Finalizar venta (Enter)</button>
+      </div>
+    </section>
+
+    <!-- Sección Ventas del día -->
+    <section id="view-ventas-dia" class="hidden">
+      <div class="bg-white p-4 rounded shadow">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <h2 class="text-xl font-bold">Ventas del día</h2>
+          <div class="flex gap-2">
+            <button id="btn-export" class="px-3 py-1 border rounded">Exportar CSV</button>
+            <button id="btn-borrar-dia" class="px-3 py-1 border rounded text-red-600">Borrar ventas de hoy</button>
+          </div>
+        </div>
+        <div class="overflow-auto mt-3">
+          <table class="w-full text-sm">
+            <thead class="bg-amber-100">
+              <tr>
+                <th class="p-2 text-left">#</th>
+                <th class="p-2 text-left">Hora</th>
+                <th class="p-2 text-left">Método</th>
+                <th class="p-2 text-right">Total</th>
+                <th class="p-2 text-right">Recibido</th>
+                <th class="p-2 text-right">Cambio</th>
+                <th class="p-2 text-left">Items</th>
+              </tr>
+            </thead>
+            <tbody id="sales-body" class="divide-y"></tbody>
+            <tfoot class="bg-amber-50">
+              <tr>
+                <td colspan="3" class="p-2 text-right font-bold">TOTAL DÍA</td>
+                <td id="sum-total" class="p-2 text-right font-extrabold">$0</td>
+                <td id="sum-recibido" class="p-2 text-right font-extrabold">$0</td>
+                <td id="sum-cambio" class="p-2 text-right font-extrabold">$0</td>
+                <td class="p-2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sección Productos (CRUD) -->
+    <section id="view-productos" class="hidden space-y-4">
+      <div class="bg-white p-4 rounded shadow">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <h2 class="text-xl font-bold">Productos</h2>
+          <div class="flex flex-wrap gap-2">
+            <button id="btn-add-product" class="px-3 py-2 bg-amber-700 text-white rounded">Nuevo producto</button>
+            <button id="btn-export-products" class="px-3 py-2 border rounded">Exportar CSV</button>
+            <label class="px-3 py-2 border rounded cursor-pointer">
+              Importar CSV
+              <input id="input-import-products" type="file" accept=".csv" class="hidden">
+            </label>
+            <button id="btn-reset-defaults" class="px-3 py-2 border rounded text-red-600">Restaurar default</button>
+          </div>
+        </div>
+        <div class="mt-3 overflow-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-amber-100">
+              <tr>
+                <th class="p-2 text-left">Nombre</th>
+                <th class="p-2 text-right">Precio</th>
+                <th class="p-2 text-left">Categoría</th>
+                <th class="p-2 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="product-body" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sección Cierre de caja -->
+    <section id="view-cierre" class="hidden space-y-4">
+      <div class="bg-white p-4 rounded shadow">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <h2 class="text-xl font-bold">Cierre de caja</h2>
+          <div class="flex flex-wrap gap-2">
+            <button id="btn-corte-x" class="px-3 py-2 border rounded">Corte X (imprimir)</button>
+            <button id="btn-corte-z" class="px-3 py-2 bg-red-600 text-white rounded">Corte Z (cerrar día)</button>
+          </div>
+        </div>
+
+        <div class="mt-3 overflow-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-amber-100">
+              <tr>
+                <th class="p-2 text-left">Método</th>
+                <th class="p-2 text-right"># Tickets</th>
+                <th class="p-2 text-right">Total</th>
+                <th class="p-2 text-right">Promedio</th>
+              </tr>
+            </thead>
+            <tbody id="cierre-body" class="divide-y"></tbody>
+            <tfoot class="bg-amber-50">
+              <tr>
+                <td class="p-2 text-right font-bold">TOTAL</td>
+                <td id="cierre-sum-cant" class="p-2 text-right font-extrabold">0</td>
+                <td id="cierre-sum-total" class="p-2 text-right font-extrabold">$0</td>
+                <td class="p-2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">El Corte X imprime el resumen sin borrar. El Corte Z registra un cierre y borra las ventas de hoy.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Ticket -->
+  <div id="ticket-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-lg shadow-lg p-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold">Ticket de venta</h3>
+        <button id="ticket-close" class="text-gray-500">✕</button>
+      </div>
+      <div id="ticket-content" class="mt-2 text-sm font-mono whitespace-pre-wrap"></div>
+      <div class="mt-4 flex gap-2 justify-end">
+        <button id="ticket-print" class="px-3 py-2 border rounded">Imprimir</button>
+        <button id="ticket-ok" class="px-3 py-2 bg-amber-700 text-white rounded">Listo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Producto (crear/editar) -->
+  <div id="product-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-lg shadow-lg p-4">
+      <div class="flex items-center justify-between">
+        <h3 id="product-modal-title" class="text-lg font-bold">Producto</h3>
+        <button id="product-close" class="text-gray-500">✕</button>
+      </div>
+      <div class="mt-3 grid gap-3">
+        <input id="pm-name" class="p-2 border rounded" placeholder="Nombre">
+        <input id="pm-price" type="number" min="0" class="p-2 border rounded" placeholder="Precio (COP)">
+        <input id="pm-category" class="p-2 border rounded" placeholder="Categoría">
+      </div>
+      <div class="mt-4 flex gap-2 justify-end">
+        <button id="product-save" class="px-3 py-2 bg-amber-700 text-white rounded">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Teclado numérico táctil -->
+  <div id="numpad" class="fixed bottom-4 right-4 z-50 bg-white rounded-2xl shadow-2xl p-3 w-64 hidden">
+    <div class="text-sm font-semibold mb-2">Teclado</div>
+    <div class="grid grid-cols-3 gap-2">
+      <button class="px-3 py-2 border rounded" data-digit="7">7</button>
+      <button class="px-3 py-2 border rounded" data-digit="8">8</button>
+      <button class="px-3 py-2 border rounded" data-digit="9">9</button>
+      <button class="px-3 py-2 border rounded" data-digit="4">4</button>
+      <button class="px-3 py-2 border rounded" data-digit="5">5</button>
+      <button class="px-3 py-2 border rounded" data-digit="6">6</button>
+      <button class="px-3 py-2 border rounded" data-digit="1">1</button>
+      <button class="px-3 py-2 border rounded" data-digit="2">2</button>
+      <button class="px-3 py-2 border rounded" data-digit="3">3</button>
+    </div>
+    <div class="grid grid-cols-3 gap-2 mt-2">
+      <button class="px-3 py-2 border rounded" data-digit="0">0</button>
+      <button class="px-3 py-2 border rounded" data-digit="00">00</button>
+      <button id="numpad-back" class="px-3 py-2 border rounded">⌫</button>
+    </div>
+    <div class="grid grid-cols-4 gap-2 mt-2">
+      <button id="npq1" class="px-3 py-2 border rounded" data-quick="0">5%</button>
+      <button id="npq2" class="px-3 py-2 border rounded" data-quick="0">10%</button>
+      <button id="npq3" class="px-3 py-2 border rounded" data-quick="0">15%</button>
+      <button id="npq4" class="px-3 py-2 border rounded" data-quick="0">20%</button>
+    </div>
+    <div class="flex gap-2 mt-2">
+      <button id="numpad-total" class="flex-1 px-3 py-2 border rounded hidden">Total</button>
+      <button id="numpad-clear" class="px-3 py-2 border rounded">Limpiar</button>
+      <button id="numpad-close" class="px-3 py-2 bg-amber-700 text-white rounded">Cerrar</button>
+    </div>
+  </div>
+
+  <script>
+    // ======= Defaults =======
+    const DEFAULT_PRODUCTS = [
+      { name: "Desayuno Huevos", price: 8000, category: "Desayunos" },
+      { name: "Desayuno Pericos", price: 9000, category: "Desayunos" },
+      { name: "Desayuno Rancheros", price: 9000, category: "Desayunos" },
+      { name: "Desayuno Carne", price: 10000, category: "Desayunos" },
+      { name: "Chocolate", price: 2500, category: "Bebidas" },
+      { name: "Café negro", price: 1500, category: "Bebidas" },
+      { name: "Café con leche", price: 2000, category: "Bebidas" },
+      { name: "Aromática", price: 1500, category: "Bebidas" },
+      { name: "Porción de huevos", price: 3000, category: "Extras" },
+      { name: "Porción de arroz", price: 2500, category: "Extras" },
+      { name: "Sopa de costilla", price: 7000, category: "Sopas" },
+      { name: "Sopa de pajarilla", price: 7000, category: "Sopas" },
+      { name: "Porción de proteína", price: 6500, category: "Extras" },
+      { name: "Empanada de carne", price: 1500, category: "Pasabocas" },
+      { name: "Dedos", price: 2000, category: "Pasabocas" },
+      { name: "Pastel de pollo", price: 2500, category: "Pasabocas" },
+      { name: "Papa aborrajada + salchichón", price: 3000, category: "Pasabocas" },
+      { name: "Papa rellena", price: 3000, category: "Pasabocas" },
+      { name: "Hojaldra", price: 1500, category: "Pasabocas" }
+    ];
+
+    // ======= Estado =======
+    let cart = [];
+    let activeInput = null;
+
+    // Productos (persistencia)
+    function loadProducts(){
+      try { return JSON.parse(localStorage.getItem('products_data')||'[]'); } catch(e){ return []; }
+    }
+    function saveProducts(arr){ localStorage.setItem('products_data', JSON.stringify(arr)); }
+    function getProducts(){ const p = loadProducts(); return p.length ? p : DEFAULT_PRODUCTS.slice(); }
+
+    // ======= Utilidades =======
+    const COP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    const fmt = v => COP.format(v || 0);
+
+    const todayKey = () => {
+      const d = new Date();
+      const utc = d.getTime() + d.getTimezoneOffset()*60000; // base UTC
+      const bogota = new Date(utc - 5*3600000); // -05:00
+      return bogota.toISOString().slice(0,10);
+    };
+
+    const loadHist = () => JSON.parse(localStorage.getItem('ventas_historial') || '[]');
+    const saveHist = arr => localStorage.setItem('ventas_historial', JSON.stringify(arr));
+    const nextConsec = () => {
+      const n = parseInt(localStorage.getItem('consecutivo') || '1000', 10);
+      localStorage.setItem('consecutivo', String(n+1));
+      return n;
+    };
+
+    // ======= Render Productos para venta =======
+    function hydrateCategories() {
+      const products = getProducts();
+      const cats = Array.from(new Set(products.map(p => p.category))).sort();
+      const sel = document.getElementById('filter-category');
+      sel.innerHTML = '<option value="">Todas las categorías</option>';
+      cats.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c; sel.appendChild(opt);
+      });
+    }
+
+    function updateProductSelectionUI() {
+      const namesInCart = new Set(cart.map(i => i.name));
+      document.querySelectorAll('#product-list [data-name]').forEach(btn => {
+        if (namesInCart.has(btn.dataset.name)) btn.classList.add('producto-seleccionado');
+        else btn.classList.remove('producto-seleccionado');
+      });
+    }
+
+    function renderProducts(filterText = '', cat = '') {
+      const list = document.getElementById('product-list');
+      list.innerHTML = '';
+      const products = getProducts();
+      products
+        .filter(p => p.name.toLowerCase().includes(filterText.toLowerCase()))
+        .filter(p => !cat || p.category === cat)
+        .forEach(p => {
+          const item = document.createElement('button');
+          item.className = 'bg-white rounded shadow p-3 text-center hover:shadow-lg';
+          item.dataset.name = p.name;
+          item.innerHTML = `
+            <h3 class="font-bold leading-tight">${p.name}</h3>
+            <p class="text-amber-700 font-extrabold">${fmt(p.price)}</p>
+          `;
+          item.onclick = () => addToCart(p);
+          list.appendChild(item);
+        });
+      updateProductSelectionUI();
+    }
+
+    // ======= Carrito =======
+    function addToCart(product) {
+      const found = cart.find(i => i.name === product.name);
+      if (found) found.qty++; else cart.push({ ...product, qty: 1 });
+      renderCart();
+    }
+
+    function changeQty(name, delta) {
+      const i = cart.findIndex(x => x.name === name);
+      if (i === -1) return;
+      cart[i].qty += delta;
+      if (cart[i].qty <= 0) cart.splice(i,1);
+      renderCart();
+    }
+
+    function removeItem(name) {
+      cart = cart.filter(x => x.name !== name);
+      renderCart();
+    }
+
+    function clearCart() {
+      cart = [];
+      renderCart();
+    }
+
+    function renderCart() {
+      const ul = document.getElementById('cart');
+      ul.innerHTML = '';
+      let subtotal = 0; let count = 0;
+      cart.forEach(item => {
+        const line = item.price * item.qty;
+        subtotal += line; count += item.qty;
+        const li = document.createElement('li');
+        li.className = 'py-2 flex items-center justify-between gap-2';
+        li.innerHTML = `
+          <div class="flex-1">
+            <div class="font-medium">${item.name}</div>
+            <div class="text-xs text-gray-500">${fmt(item.price)} c/u</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="px-2 py-1 border rounded" aria-label="disminuir" onclick="changeQty('${item.name.replace(/'/g, "\\'")}', -1)">−</button>
+            <span class="w-8 text-center">${item.qty}</span>
+            <button class="px-2 py-1 border rounded" aria-label="aumentar" onclick="changeQty('${item.name.replace(/'/g, "\\'")}', 1)">+</button>
+          </div>
+          <div class="w-24 text-right font-semibold">${fmt(line)}</div>
+          <button class="text-red-600" aria-label="quitar" onclick="removeItem('${item.name.replace(/'/g, "\\'")}')">🗑️</button>
+        `;
+        ul.appendChild(li);
+      });
+
+      document.getElementById('cart-items-count').textContent = `${count} ítems`;
+      const discountPct = Math.min(Math.max(parseFloat(document.getElementById('discount').value || '0'), 0), 100);
+      const discountAmount = Math.round(subtotal * (discountPct/100));
+      const total = subtotal - discountAmount;
+      document.getElementById('subtotal').textContent = fmt(subtotal);
+      document.getElementById('discount-amount').textContent = fmt(discountAmount);
+      document.getElementById('total').textContent = fmt(total);
+
+      const payMethod = document.getElementById('pay-method').value;
+      const received = parseInt(document.getElementById('cash-received').value || '0', 10);
+      const change = payMethod === 'Efectivo' ? Math.max(received - total, 0) : 0;
+      document.getElementById('change').textContent = fmt(change);
+
+      // Actualiza selección visual de productos
+      updateProductSelectionUI();
+    }
+
+    // ======= Ventas =======
+    function checkout() {
+      if (!cart.length) { alert('El carrito está vacío'); return; }
+      const discountPct = Math.min(Math.max(parseFloat(document.getElementById('discount').value || '0'), 0), 100);
+      const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
+      const discountAmount = Math.round(subtotal * (discountPct/100));
+      const total = subtotal - discountAmount;
+      const payMethod = document.getElementById('pay-method').value;
+      const received = parseInt(document.getElementById('cash-received').value || '0', 10);
+      const change = payMethod === 'Efectivo' ? Math.max(received - total, 0) : 0;
+
+      const consec = nextConsec();
+      const now = new Date();
+      const sale = {
+        id: consec,
+        dateISO: now.toISOString(),
+        dayKey: todayKey(),
+        items: cart.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
+        subtotal, discountPct, discountAmount, total, payMethod, received, change
+      };
+
+      const hist = loadHist();
+      hist.push(sale);
+      saveHist(hist);
+
+      showTicket(sale);
+
+      document.getElementById('discount').value = '';
+      document.getElementById('cash-received').value = '';
+      cart = [];
+      renderCart();
+      renderSalesToday();
+    }
+
+    function showTicket(sale) {
+      const lines = [];
+      lines.push('   CAFETERÍA – TICKET');
+      lines.push('--------------------------------');
+      lines.push(`Venta N°: ${sale.id}`);
+      const d = new Date(sale.dateISO);
+      lines.push(`Fecha: ${d.toLocaleDateString('es-CO')} ${d.toLocaleTimeString('es-CO')}`);
+      lines.push('--------------------------------');
+      sale.items.forEach(it => {
+        lines.push(`${it.qty} x ${it.name}`);
+        lines.push(`   ${fmt(it.price)}  ->  ${fmt(it.price*it.qty)}`);
+      });
+      lines.push('--------------------------------');
+      lines.push(`Subtotal:  ${fmt(sale.subtotal)}`);
+      if (sale.discountAmount) lines.push(`Desc (${sale.discountPct}%): -${fmt(sale.discountAmount)}`);
+      lines.push(`TOTAL:     ${fmt(sale.total)}`);
+      lines.push(`Pago: ${sale.payMethod}`);
+      if (sale.payMethod === 'Efectivo') {
+        lines.push(`Recibido:  ${fmt(sale.received)}`);
+        lines.push(`Cambio:    ${fmt(sale.change)}`);
+      }
+      lines.push('--------------------------------');
+      lines.push('¡Gracias por su compra!');
+
+      document.getElementById('ticket-content').textContent = lines.join('\n');
+      document.getElementById('ticket-modal').classList.remove('hidden');
+      document.getElementById('ticket-modal').classList.add('flex');
+    }
+
+    function renderSalesToday() {
+      const body = document.getElementById('sales-body');
+      body.innerHTML = '';
+      const hist = loadHist().filter(s => s.dayKey === todayKey());
+      let sumT = 0, sumR = 0, sumC = 0;
+      hist.forEach(s => {
+        sumT += s.total; sumR += (s.received||0); sumC += (s.change||0);
+        const tr = document.createElement('tr');
+        const t = new Date(s.dateISO);
+        const itemsTxt = s.items.map(i => `${i.qty}x ${i.name}`).join(', ');
+        tr.innerHTML = `
+          <td class="p-2">${s.id}</td>
+          <td class="p-2">${t.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</td>
+          <td class="p-2">${s.payMethod}</td>
+          <td class="p-2 text-right">${fmt(s.total)}</td>
+          <td class="p-2 text-right">${fmt(s.received||0)}</td>
+          <td class="p-2 text-right">${fmt(s.change||0)}</td>
+          <td class="p-2">${itemsTxt}</td>
+        `;
+        body.appendChild(tr);
+      });
+      document.getElementById('sum-total').textContent = fmt(sumT);
+      document.getElementById('sum-recibido').textContent = fmt(sumR);
+      document.getElementById('sum-cambio').textContent = fmt(sumC);
+    }
+
+    function exportCSVToday() {
+      const rows = [['id','fecha','hora','metodo','subtotal','descuento_pct','descuento_valor','total','recibido','cambio','items']];
+      const hist = loadHist().filter(s => s.dayKey === todayKey());
+      hist.forEach(s => {
+        const d = new Date(s.dateISO);
+        const itemsTxt = s.items.map(i => `${i.qty}x ${i.name}`).join(' | ');
+        rows.push([
+          s.id,
+          d.toLocaleDateString('es-CO'),
+          d.toLocaleTimeString('es-CO'),
+          s.payMethod,
+          s.subtotal,
+          s.discountPct,
+          s.discountAmount,
+          s.total,
+          s.received||0,
+          s.change||0,
+          itemsTxt
+        ]);
+      });
+      const csv = rows.map(r => r.map(x => `"${String(x).replaceAll('"','""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `ventas_${todayKey()}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function borrarVentasDeHoy() {
+      const all = loadHist();
+      const rest = all.filter(s => s.dayKey !== todayKey());
+      if (rest.length === all.length) { alert('No hay ventas de hoy.'); return; }
+      if (!confirm('¿Borrar TODAS las ventas de hoy?')) return;
+      saveHist(rest);
+      renderSalesToday();
+      updateProductSelectionUI();
+    }
+
+    // ======= CRUD Productos =======
+    function renderProductsTable(){
+      const body = document.getElementById('product-body');
+      body.innerHTML = '';
+      const products = getProducts();
+      products.forEach((p, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="p-2">${p.name}</td>
+          <td class="p-2 text-right">${fmt(p.price)}</td>
+          <td class="p-2">${p.category||''}</td>
+          <td class="p-2 text-right">
+            <button class="px-2 py-1 border rounded mr-1" onclick="openProductModal(${idx})">Editar</button>
+            <button class="px-2 py-1 border rounded text-red-600" onclick="deleteProduct(${idx})">Eliminar</button>
+          </td>`;
+        body.appendChild(tr);
+      });
+    }
+
+    function openProductModal(index){
+      const products = getProducts();
+      const editing = index != null && index >= 0;
+      const modal = document.getElementById('product-modal');
+      const title = document.getElementById('product-modal-title');
+      const name = document.getElementById('pm-name');
+      const price = document.getElementById('pm-price');
+      const cat = document.getElementById('pm-category');
+      title.textContent = editing ? 'Editar producto' : 'Nuevo producto';
+      if (editing) {
+        name.value = products[index].name;
+        price.value = products[index].price;
+        cat.value = products[index].category||'';
+      } else {
+        name.value = '';
+        price.value = '';
+        cat.value = '';
+      }
+      modal.dataset.index = editing ? String(index) : '';
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeProductModal(){
+      const modal = document.getElementById('product-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      modal.dataset.index = '';
+    }
+
+    function saveProductFromModal(){
+      const name = document.getElementById('pm-name').value.trim();
+      const price = parseInt(document.getElementById('pm-price').value || '0', 10);
+      const category = document.getElementById('pm-category').value.trim();
+      if(!name || price <= 0){ alert('Nombre y precio son obligatorios'); return; }
+      const products = getProducts();
+      const idxStr = document.getElementById('product-modal').dataset.index;
+      if (idxStr !== '') {
+        const i = parseInt(idxStr, 10);
+        products[i] = { name, price, category };
+      } else {
+        products.push({ name, price, category });
+      }
+      saveProducts(products);
+      closeProductModal();
+      hydrateCategories();
+      renderProducts(document.getElementById('search').value, document.getElementById('filter-category').value);
+      renderProductsTable();
+    }
+
+    function deleteProduct(index){
+      const products = getProducts();
+      const p = products[index];
+      if(!confirm(`¿Eliminar "${p.name}"?`)) return;
+      products.splice(index,1);
+      saveProducts(products);
+      hydrateCategories();
+      renderProducts(document.getElementById('search').value, document.getElementById('filter-category').value);
+      renderProductsTable();
+    }
+
+    function exportProductsCSV(){
+      const rows = [['name','price','category']];
+      getProducts().forEach(p => rows.push([p.name, p.price, p.category||'' ]));
+      const csv = rows.map(r => r.map(x => `"${String(x).replaceAll('"','""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'productos.csv'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importProductsCSV(file){
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const text = String(reader.result||'');
+          const lines = text.split(/\r?\n/).filter(Boolean);
+          if(!lines.length) return alert('CSV vacío');
+          const header = lines.shift().split(',').map(s=>s.replace(/^\"|\"$/g,'').trim().toLowerCase());
+          const iName = header.indexOf('name');
+          const iPrice = header.indexOf('price');
+          const iCat = header.indexOf('category');
+          if (iName===-1 || iPrice===-1) return alert('El CSV debe incluir columnas name y price');
+          const arr = [];
+          for(const line of lines){
+            const cols = line.match(/\"([^\"]*)\"|[^,]+/g) || [];
+            const safe = cols.map(c=>c.replace(/^\"|\"$/g,'').trim());
+            const name = safe[iName]||'';
+            const price = parseInt((safe[iPrice]||'0').replace(/\D+/g,''),10);
+            const category = iCat!==-1 ? safe[iCat] : '';
+            if(name && price>0) arr.push({name, price, category});
+          }
+          if(!arr.length) return alert('No se encontraron productos válidos.');
+          saveProducts(arr);
+          hydrateCategories();
+          renderProducts(document.getElementById('search').value, document.getElementById('filter-category').value);
+          renderProductsTable();
+          alert('Productos importados correctamente');
+        } catch(e){
+          alert('Error al importar CSV');
+        }
+      };
+      reader.readAsText(file, 'utf-8');
+    }
+
+    function resetDefaults(){
+      if(!confirm('Esto reemplazará los productos actuales por los predeterminados.')) return;
+      saveProducts(DEFAULT_PRODUCTS.slice());
+      hydrateCategories();
+      renderProducts(document.getElementById('search').value, document.getElementById('filter-category').value);
+      renderProductsTable();
+    }
+
+    // ======= Cierre de caja =======
+    function ventasDeHoy(){
+      return loadHist().filter(s => s.dayKey === todayKey());
+    }
+
+    function resumenPorMetodo(ventas){
+      const map = new Map(); // metodo -> {count, total}
+      ventas.forEach(v => {
+        const k = v.payMethod || 'Otro';
+        const cur = map.get(k) || { count: 0, total: 0 };
+        cur.count += 1;
+        cur.total += v.total;
+        map.set(k, cur);
+      });
+      return Array.from(map, ([method, data]) => ({
+        method, count: data.count, total: data.total, avg: data.count ? Math.round(data.total / data.count) : 0
+      })).sort((a,b) => a.method.localeCompare(b.method));
+    }
+
+    function renderCierre(){
+      const body = document.getElementById('cierre-body');
+      body.innerHTML = '';
+      const vts = ventasDeHoy();
+      const rows = resumenPorMetodo(vts);
+      let sumCant = 0, sumTotal = 0;
+      rows.forEach(r => {
+        sumCant += r.count; sumTotal += r.total;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="p-2">${r.method}</td>
+          <td class="p-2 text-right">${r.count}</td>
+          <td class="p-2 text-right">${fmt(r.total)}</td>
+          <td class="p-2 text-right">${fmt(r.avg)}</td>
+        `;
+        body.appendChild(tr);
+      });
+      document.getElementById('cierre-sum-cant').textContent = String(sumCant);
+      document.getElementById('cierre-sum-total').textContent = fmt(sumTotal);
+      return { sumCant, sumTotal, rows };
+    }
+
+    function imprimirTextoPlano(text){
+      const w = window.open('', '_blank');
+      w.document.write(`<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap;">${text}</pre>`);
+      w.document.close(); w.focus(); w.print();
+    }
+
+    function generarTextoCorte(tipo, info){
+      const now = new Date();
+      const encabezado = [
+        '        CAFETERÍA – ' + (tipo === 'Z' ? 'CORTE Z' : 'CORTE X'),
+        '----------------------------------------',
+        `Fecha: ${now.toLocaleDateString('es-CO')} ${now.toLocaleTimeString('es-CO')}`,
+        `Día: ${todayKey()}`,
+        '----------------------------------------'
+      ];
+      const body = info.rows.map(r => `${r.method.padEnd(14)}  ${String(r.count).padStart(3)}  ${fmt(r.total).padStart(10)}  (avg ${fmt(r.avg)})`);
+      const footer = [
+        '----------------------------------------',
+        `TOTAL TICKETS: ${info.sumCant}`,
+        `TOTAL VENDIDO: ${fmt(info.sumTotal)}`,
+        '----------------------------------------',
+        (tipo === 'Z' ? 'Cierre registrado y ventas del día limpiadas.' : 'Resumen sin borrar ventas.')
+      ];
+      return [...encabezado, ...body, ...footer].join('\n');
+    }
+
+    function guardarCierreZ(info){
+      const arr = JSON.parse(localStorage.getItem('cierres_historial') || '[]');
+      arr.push({
+        dateISO: new Date().toISOString(),
+        dayKey: todayKey(),
+        sumTickets: info.sumCant,
+        sumTotal: info.sumTotal,
+        breakdown: info.rows
+      });
+      localStorage.setItem('cierres_historial', JSON.stringify(arr));
+    }
+
+    // ======= Tabs =======
+    function setTab(tab) {
+      document.getElementById('view-venta').classList.toggle('hidden', tab !== 'venta');
+      document.getElementById('view-ventas-dia').classList.toggle('hidden', tab !== 'ventas');
+      document.getElementById('view-productos').classList.toggle('hidden', tab !== 'productos');
+      document.getElementById('view-cierre').classList.toggle('hidden', tab !== 'cierre');
+
+      document.getElementById('tab-venta').className       = tab === 'venta'     ? 'tab-btn px-4 py-2 rounded bg-amber-700 text-white' : 'tab-btn px-4 py-2 rounded bg-white border';
+      document.getElementById('tab-ventas-dia').className  = tab === 'ventas'    ? 'tab-btn px-4 py-2 rounded bg-amber-700 text-white' : 'tab-btn px-4 py-2 rounded bg-white border';
+      document.getElementById('tab-productos').className   = tab === 'productos' ? 'tab-btn px-4 py-2 rounded bg-amber-700 text-white' : 'tab-btn px-4 py-2 rounded bg-white border';
+      document.getElementById('tab-cierre').className      = tab === 'cierre'    ? 'tab-btn px-4 py-2 rounded bg-amber-700 text-white' : 'tab-btn px-4 py-2 rounded bg-white border';
+
+      if (tab === 'ventas') renderSalesToday();
+      if (tab === 'productos') renderProductsTable();
+      if (tab === 'cierre') renderCierre();
+    }
+
+    // ======= Eventos =======
+    document.getElementById('search').addEventListener('input', e => {
+      renderProducts(e.target.value, document.getElementById('filter-category').value);
+    });
+    document.getElementById('filter-category').addEventListener('change', e => {
+      renderProducts(document.getElementById('search').value, e.target.value);
+    });
+    document.getElementById('discount').addEventListener('input', renderCart);
+    document.getElementById('pay-method').addEventListener('change', renderCart);
+    document.getElementById('cash-received').addEventListener('input', renderCart);
+
+    document.getElementById('checkout').addEventListener('click', checkout);
+    document.getElementById('btn-clear').addEventListener('click', clearCart);
+
+    document.getElementById('tab-venta').addEventListener('click', () => setTab('venta'));
+    document.getElementById('tab-ventas-dia').addEventListener('click', () => setTab('ventas'));
+    document.getElementById('tab-productos').addEventListener('click', () => setTab('productos'));
+    document.getElementById('tab-cierre').addEventListener('click', () => setTab('cierre'));
+
+    // Modal ticket
+    document.getElementById('ticket-close').addEventListener('click', () => {
+      document.getElementById('ticket-modal').classList.add('hidden');
+      document.getElementById('ticket-modal').classList.remove('flex');
+    });
+    document.getElementById('ticket-ok').addEventListener('click', () => {
+      document.getElementById('ticket-modal').classList.add('hidden');
+      document.getElementById('ticket-modal').classList.remove('flex');
+    });
+    document.getElementById('ticket-print').addEventListener('click', () => {
+      const content = document.getElementById('ticket-content').textContent;
+      const w = window.open('', '_blank');
+      w.document.write(`<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap;">${content}</pre>`);
+      w.document.close();
+      w.focus();
+      w.print();
+    });
+
+    // Ventas del día
+    document.getElementById('btn-export').addEventListener('click', exportCSVToday);
+    document.getElementById('btn-borrar-dia').addEventListener('click', borrarVentasDeHoy);
+
+    // CRUD Productos
+    document.getElementById('btn-add-product').addEventListener('click', () => openProductModal(-1));
+    document.getElementById('product-close').addEventListener('click', closeProductModal);
+    document.getElementById('product-save').addEventListener('click', saveProductFromModal);
+    document.getElementById('btn-export-products').addEventListener('click', exportProductsCSV);
+    document.getElementById('btn-reset-defaults').addEventListener('click', resetDefaults);
+    document.getElementById('input-import-products').addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) importProductsCSV(f);
+      e.target.value = '';
+    });
+
+    // Cierre de caja listeners
+    document.getElementById('btn-corte-x').addEventListener('click', () => {
+      const info = renderCierre();
+      const texto = generarTextoCorte('X', info);
+      imprimirTextoPlano(texto);
+    });
+    document.getElementById('btn-corte-z').addEventListener('click', () => {
+      const info = renderCierre();
+      if (!info.sumCant) { alert('No hay ventas hoy.'); return; }
+      if (!confirm('¿Confirmas CORTE Z? Esto registrará el cierre y borrará TODAS las ventas de hoy.')) return;
+      guardarCierreZ(info);
+      const all = loadHist();
+      const rest = all.filter(s => s.dayKey !== todayKey());
+      saveHist(rest);
+      renderSalesToday();
+      renderCierre();
+      alert('Corte Z realizado. Ventas del día limpiadas.');
+      updateProductSelectionUI();
+    });
+
+    // Atajos de teclado
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !document.getElementById('product-modal').classList.contains('flex')) checkout();
+    });
+
+    // Numpad táctil
+    function showKeypadFor(input) {
+      activeInput = input;
+      const pad = document.getElementById('numpad');
+      pad.classList.remove('hidden');
+      const mode = input.dataset.keypad; // 'money' | 'percent'
+      const qBtns = [1,2,3,4].map(i => document.getElementById('npq'+i));
+      const totalBtn = document.getElementById('numpad-total');
+      if (mode === 'money') {
+        const vals = [10000, 20000, 50000, 100000];
+        qBtns.forEach((btn, idx) => { btn.textContent = (vals[idx]/1000)+'k'; btn.dataset.quick = String(vals[idx]); });
+        totalBtn.classList.remove('hidden');
+      } else {
+        const vals = [5,10,15,20];
+        qBtns.forEach((btn, idx) => { btn.textContent = vals[idx]+'%'; btn.dataset.quick = String(vals[idx]); });
+        totalBtn.classList.add('hidden');
+      }
+    }
+    function hideKeypad(){
+      const pad = document.getElementById('numpad');
+      pad.classList.add('hidden');
+      activeInput = null;
+    }
+    function appendDigit(d){
+      if(!activeInput) return;
+      activeInput.value = (activeInput.value || '') + d;
+      if(activeInput.id === 'discount'){
+        let v = Math.min(100, Math.max(0, parseInt(activeInput.value||'0',10)));
+        activeInput.value = isNaN(v) ? '' : String(v);
+      }
+      activeInput.dispatchEvent(new Event('input', { bubbles:true }));
+    }
+    function applyQuick(val){
+      if(!activeInput) return;
+      activeInput.value = String(val);
+      activeInput.dispatchEvent(new Event('input', { bubbles:true }));
+    }
+
+    document.querySelectorAll('#numpad [data-digit]').forEach(btn => {
+      btn.addEventListener('click', () => appendDigit(btn.dataset.digit));
+    });
+    ['npq1','npq2','npq3','npq4'].forEach(id => {
+      document.getElementById(id).addEventListener('click', (e) => {
+        const v = parseInt(e.currentTarget.dataset.quick, 10);
+        if(!isNaN(v)) applyQuick(v);
+      });
+    });
+    document.getElementById('numpad-total').addEventListener('click', () => {
+      const discountPct = Math.min(Math.max(parseFloat(document.getElementById('discount').value || '0'), 0), 100);
+      const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
+      const discountAmount = Math.round(subtotal * (discountPct/100));
+      const total = subtotal - discountAmount;
+      const inp = document.getElementById('cash-received');
+      inp.value = String(total);
+      inp.dispatchEvent(new Event('input', { bubbles:true }));
+    });
+    document.getElementById('numpad-clear').addEventListener('click', () => {
+      if(!activeInput) return; activeInput.value = ''; activeInput.dispatchEvent(new Event('input', { bubbles:true }));
+    });
+    document.getElementById('numpad-back').addEventListener('click', () => {
+      if(!activeInput) return; activeInput.value = (activeInput.value || '').slice(0,-1); activeInput.dispatchEvent(new Event('input', { bubbles:true }));
+    });
+    document.getElementById('numpad-close').addEventListener('click', hideKeypad);
+
+    document.querySelectorAll('.keypadable').forEach(inp => {
+      inp.addEventListener('focus', () => showKeypadFor(inp));
+    });
+
+    // ======= Init =======
+    hydrateCategories();
+    renderProducts();
+    renderCart();
+  </script>
+</body>
+</html>
